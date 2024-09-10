@@ -1,11 +1,16 @@
 package com.metabolic.data.core.services.spark.writer
 
 import com.holdenkarau.spark.testing.{DataFrameSuiteBase, SharedSparkContext}
+import com.metabolic.data.core.services.spark.writer.file.IcebergWriter
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.funsuite.AnyFunSuite
+import com.metabolic.data.mapper.domain.io.{EngineMode, WriteMode}
+
+import java.io.File
+import scala.reflect.io.Directory
 
 class IcebergWriterTest extends AnyFunSuite
   with DataFrameSuiteBase
@@ -42,28 +47,55 @@ class IcebergWriterTest extends AnyFunSuite
     StructField("date", StringType, true),
   )
 
-  test("Iceberg playground") {
+  test("Iceberg overwrite") {
 
     val inputDF = spark.createDataFrame(
       spark.sparkContext.parallelize(inputData),
       StructType(someSchema)
     )
 
-    inputDF
-      .write
-      .format("iceberg")
-      .mode("overwrite")
-      .saveAsTable("local.data_lake.letters")
+    val fqn = "local.data_lake.letters_overwrite"
+    val wm = WriteMode.Overwrite
+    val cpl = ""
+   val iceberg =  new IcebergWriter(fqn, wm, cpl)(spark)
 
-    //inputDF.writeTo("local.data_lake.letters_2").overwrite()
-    //inputDF.writeTo("local.data_lake.letters").append()
+    iceberg.write(inputDF, EngineMode.Batch)
 
-    val outputDf = spark.table("local.data_lake.letters")
+    val outputDf = spark.table(fqn)
 
     assertDataFrameNoOrderEquals(inputDF, outputDf)
 
 
+  }
 
+  test("Iceberg append") {
+
+    new Directory(new File("./warehouse/data_lake/letters_append")).deleteRecursively()
+
+    val inputDF = spark.createDataFrame(
+      spark.sparkContext.parallelize(inputData),
+      StructType(someSchema)
+    )
+
+    val fqn = "local.data_lake.letters_append"
+    val wm = WriteMode.Append
+    val cpl = ""
+    val iceberg =  new IcebergWriter(fqn, wm, cpl)(spark)
+
+    iceberg.write(inputDF, EngineMode.Batch)
+    iceberg.write(inputDF, EngineMode.Batch)
+
+    val outputDf = spark.table(fqn)
+
+    val expectedDf = inputDF.union(inputDF)
+
+    assertDataFrameNoOrderEquals(expectedDf, outputDf)
+
+
+  }
+
+  ignore("Iceberg stream  append") {
+    //TODO: Implement this test
   }
 
 
