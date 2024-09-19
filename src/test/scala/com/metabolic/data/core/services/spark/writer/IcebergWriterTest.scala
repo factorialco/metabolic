@@ -133,5 +133,4 @@ class IcebergWriterTest extends AnyFunSuite
 
   }
 
-
 }
